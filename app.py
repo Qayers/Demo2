@@ -1,43 +1,51 @@
-import pathlib
-from pathlib import Path
+# źródło danych [https://www.kaggle.com/c/titanic/](https://www.kaggle.com/c/titanic)
 
 import streamlit as st
-from fastai.vision.all import *
-from fastai.vision.widgets import *
+import pickle
+from datetime import datetime
+startTime = datetime.now()
+# import znanych nam bibliotek
 
-temp = pathlib.PosixPath
-pathlib.PosixPath = pathlib.WindowsPath
+filename = "model.sv"
+model = pickle.load(open(filename,'rb'))
+# otwieramy wcześniej wytrenowany model
 
-learn_inf = load_learner('model.pkl')
+sex_d = {0:"Kobieta",1:"Mężczyzna"}
+pclass_d = {0:"Pierwsza",1:"Druga", 2:"Trzecia"}
+embarked_d = {0:"Cherbourg", 1:"Queenstown", 2:"Southampton"}
+# o ile wcześniej kodowaliśmy nasze zmienne, to teraz wprowadzamy etykiety z ich nazewnictwem
 
-class Predict:
-    def __init__(self, filename):
-        self.learn_inference = load_learner(Path()/filename)
-        self.img = self.get_image_from_upload()
-        if self.img is not None:
-            self.display_output()
-            self.get_prediction()
-    
-    @staticmethod
-    def get_image_from_upload():
-        uploaded_file = st.file_uploader("Upload Files",type=['png','jpeg', 'jpg'])
-        if uploaded_file is not None:
-            return PILImage.create((uploaded_file))
-        return None
+def main():
 
-    def display_output(self):
-        st.image(self.img.to_thumb(250,250), caption='Uploaded Image')
+	st.set_page_config(page_title="Aplikacja do predykcji przeżycia pasażera Titanica")
+	overview = st.container()
+	left, right = st.columns(2)
+	prediction = st.container()
 
-    def get_prediction(self):
+	st.image("https://media1.popsugar-assets.com/files/thumbor/7CwCuGAKxTrQ4wPyOBpKjSsd1JI/fit-in/2048xorig/filters:format_auto-!!-:strip_icc-!!-/2017/04/19/743/n/41542884/5429b59c8e78fbc4_MCDTITA_FE014_H_1_.JPG")
 
-        if st.button('Classify'):
-            pred, pred_idx, probs = self.learn_inference.predict(self.img)
-            st.write(f'**Prediction**: {pred}')
-            st.write(f'**Probability**: {probs[pred_idx]*100:.02f}%')
-        else: 
-            st.write(f'Click the button to classify') 
+	with overview:
+		st.title("Aplikacja do predykcji przeżycia pasażera Titanica")
 
-if __name__=='__main__':
+	with left:
+		sex_radio = st.radio( "Płeć", list(sex_d.keys()), format_func=lambda x : sex_d[x] )
+		pclass_radio = st.radio( "Klasa", list(pclass_d.keys()), format_func=lambda x: pclass_d[x])
+		embarked_radio = st.radio( "Port zaokrętowania", list(embarked_d.keys()), index=2, format_func= lambda x: embarked_d[x] )
 
-    file_name='model.pkl'
-predictor = Predict(file_name)
+	with right:
+		age_slider = st.slider("Wiek", value=1, min_value=1, max_value=100)
+		sibsp_slider = st.slider("Liczba rodzeństwa i/lub partnera", min_value=0, max_value=10)
+		parch_slider = st.slider("Liczba rodziców i/lub dzieci", min_value=0, max_value=10)
+		fare_slider = st.slider("Cena biletu", min_value=0, max_value=500, step=1)
+
+	data = [[pclass_radio, sex_radio,  age_slider, sibsp_slider, parch_slider, fare_slider, embarked_radio]]
+	survival = model.predict(data)
+	s_confidence = model.predict_proba(data)
+
+	with prediction:
+		st.subheader("Czy taka osoba przeżyłaby katastrofę?")
+		st.subheader(("Tak" if survival[0] == 1 else "Nie"))
+		st.write("Pewność predykcji {0:.2f} %".format(s_confidence[0][survival][0] * 100))
+
+if __name__ == "__main__":
+    main()
